@@ -11,6 +11,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 
+# Add project root to sys.path to allow absolute imports like 'from python.xxx'
+project_root = str(Path(__file__).resolve().parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 # Import our custom components
 from python.cookie_manager import (
     load_cookies_from_browser_export,

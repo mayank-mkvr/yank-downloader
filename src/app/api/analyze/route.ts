@@ -74,14 +74,16 @@ export async function POST(req: NextRequest) {
           thumbnail: info.video_details.thumbnails[0]?.url || '',
           duration: info.video_details.durationRaw || `${Math.floor(info.video_details.durationInSec / 60)}:${(info.video_details.durationInSec % 60).toString().padStart(2, '0')}`,
           qualities: info.format
-            .filter((f: any) => f.hasVideo)
+            .filter((f: any) => f.mimeType?.startsWith('video/') || f.height > 0)
             .map((f: any) => {
-              const height = f.height || (f.quality_label ? parseInt(f.quality_label) : 0);
+              const height = f.height || (f.qualityLabel ? parseInt(f.qualityLabel) : 0);
+              const container = f.mimeType?.split(';')[0]?.split('/')[1] || 'mp4';
+              const rawSize = f.contentLength || f.content_length || f.filesize;
               return {
                 formatId: f.itag?.toString() || f.format_id,
-                quality: f.quality_label || (height ? `${height}p` : '720p'),
-                ext: f.container || 'mp4',
-                sizeMB: f.content_length ? (parseInt(f.content_length) / (1024 * 1024)).toFixed(1) : (f.filesize ? (f.filesize / (1024 * 1024)).toFixed(1) : '??'),
+                quality: f.qualityLabel || (height ? `${height}p` : '720p'),
+                ext: container,
+                sizeMB: rawSize ? (parseInt(rawSize) / (1024 * 1024)).toFixed(1) : '??',
                 height: height
               };
             })

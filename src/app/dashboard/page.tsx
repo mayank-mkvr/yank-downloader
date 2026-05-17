@@ -260,13 +260,15 @@ export default function Dashboard() {
             { 
               label: "Data Saved", 
               value: (() => {
-                const totalMB = history.reduce((sum, item) => {
+                const totalMB = (history || []).reduce((sum, item) => {
+                  if (!item || typeof item !== 'object') return sum;
                   const match = item.size?.match(/(\d+(\.\d+)?)\s*MB/);
                   return sum + (match ? parseFloat(match[1]) : 0);
                 }, 0);
                 return totalMB > 1024 ? (totalMB / 1024).toFixed(1) : totalMB.toFixed(0);
               })(), 
-              prefix: history.reduce((sum, item) => {
+              prefix: (history || []).reduce((sum, item) => {
+                if (!item || typeof item !== 'object') return sum;
                 const match = item.size?.match(/(\d+(\.\d+)?)\s*MB/);
                 return sum + (match ? parseFloat(match[1]) : 0);
               }, 0) > 1024 ? "GB" : "MB", 
@@ -274,7 +276,7 @@ export default function Dashboard() {
             },
             { 
               label: "Secure Sessions", 
-              value: Object.values(cookieStatus).filter((p: any) => p.configured && p.valid).length.toString(), 
+              value: Object.values(cookieStatus || {}).filter((p: any) => p && typeof p === 'object' && p.configured && p.valid).length.toString(), 
               prefix: "/ 5 active", 
               color: "text-brand-blue" 
             },
@@ -467,7 +469,9 @@ export default function Dashboard() {
                   { id: "onedrive", name: "OneDrive", domain: "onedrive.live.com" },
                   { id: "telegram", name: "Telegram", domain: "t.me" }
                 ].map((platform) => {
-                  const status = cookieStatus[platform.id] || { configured: false, count: 0, valid: false };
+                  const status = (cookieStatus && typeof cookieStatus === 'object' && platform.id in cookieStatus) 
+                    ? cookieStatus[platform.id] 
+                    : { configured: false, count: 0, valid: false };
                   return (
                     <div 
                       key={platform.id} 

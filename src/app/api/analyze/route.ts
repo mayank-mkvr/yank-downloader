@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import ytdl from '@/lib/ytdlp';
 import play from 'play-dl';
 import path from 'path';
+import fs from 'fs';
 import { getRandomProxy } from '@/lib/proxy';
 import { ensurePythonEngineRunning } from '@/lib/pythonEngine';
+import { generateNetscapeCookieFile } from '@/lib/cookieManager';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://127.0.0.1:8000';
 
@@ -53,82 +55,107 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Standard Fallback local extraction
-    const cookiePath = path.resolve(process.cwd(), 'cookies.txt');
+    let cookiePath = path.resolve(process.cwd(), 'cookies.txt');
+    let generatedCookieFile: string | null = null;
     let responseData: any = null;
 
-    // Try play-dl first for YouTube
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      try {
-        await play.setToken({
-          youtube: { cookie: cookiePath }
-        });
+    try {
+      const plat = url.includes('youtube.com') || url.includes('youtu.be') ? 'youtube' :
+                   url.includes('instagram.com') ? 'instagram' :
+                   url.includes('facebook.com') || url.includes('fb.watch') ? 'facebook' : null;
 
-        const info = await play.video_info(url, {
-          proxies: proxy ? [proxy] : undefined
-        } as any);
+      if (plat) {
+        generatedCookieFile = generateNetscapeCookieFile(plat);
+        if (generatedCookieFile) {
+          cookiePath = generatedCookieFile;
+          console.log(`Generated native Netscape cookie file for fallback extraction: ${cookiePath}`);
+        }
+      }
+
+      // Try play-dl first for YouTube
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        try {
+          await play.setToken({
+            youtube: { cookie: cookiePath }
+          });
+
+          const info = await play.video_info(url, {
+            proxies: proxy ? [proxy] : undefined
+          } as any);
+
+          responseData = {
+            id: info.video_details.id,
+            title: info.video_details.title,
+            author: info.video_details.channel?.name || 'Unknown',
+            thumbnail: info.video_details.thumbnails[0]?.url || '',
+            duration: info.video_details.durationRaw || `${Math.floor(info.video_details.durationInSec / 60)}:${(info.video_details.durationInSec % 60).toString().padStart(2, '0')}`,
+            qualities: info.format
+              .filter((f: any) => f.mimeType?.startsWith('video/') || f.height > 0)
+              .map((f: any) => {
+                const height = f.height || (f.qualityLabel ? parseInt(f.qualityLabel) : 0);
+                const container = f.mimeType?.split(';')[0]?.split('/')[1] || 'mp4';
+                const rawSize = f.contentLength || f.content_length || f.filesize;
+                return {
+                  formatId: f.itag?.toString() || f.format_id,
+                  quality: f.qualityLabel || (height ? `${height}p` : '720p'),
+                  ext: container,
+                  sizeMB: rawSize ? (parseInt(rawSize) / (1024 * 1024)).toFixed(1) : '??',
+                  height: height
+                };
+              })
+              .sort((a: any, b: any) => b.height - a.height),
+            size: 'Varies',
+            source: 'youtube'
+          };
+        } catch (e: any) {
+          console.warn('play-dl failed, falling back to yt-dlp:', e.message);
+        }
+      }
+
+      if (!responseData) {
+        // Generic local yt-dlp fallback
+        const metadata = (await ytdl()(url, {
+          dumpJson: true,
+          noWarnings: true,
+          noPlaylist: true,
+          noCheckCertificates: true,
+          cookies: cookiePath,
+          proxy: proxy || undefined
+        })) as any;
 
         responseData = {
-          id: info.video_details.id,
-          title: info.video_details.title,
-          author: info.video_details.channel?.name || 'Unknown',
-          thumbnail: info.video_details.thumbnails[0]?.url || '',
-          duration: info.video_details.durationRaw || `${Math.floor(info.video_details.durationInSec / 60)}:${(info.video_details.durationInSec % 60).toString().padStart(2, '0')}`,
-          qualities: info.format
-            .filter((f: any) => f.mimeType?.startsWith('video/') || f.height > 0)
+          id: metadata.id,
+          title: metadata.title,
+          author: metadata.uploader || 'Unknown',
+          thumbnail: metadata.thumbnail,
+          duration: metadata.duration_string || `${Math.floor(metadata.duration / 60)}:${(metadata.duration % 60).toString().padStart(2, '0')}`,
+          qualities: metadata.formats
+            ?.filter((f: any) => f.vcodec && f.vcodec !== 'none')
             .map((f: any) => {
-              const height = f.height || (f.qualityLabel ? parseInt(f.qualityLabel) : 0);
-              const container = f.mimeType?.split(';')[0]?.split('/')[1] || 'mp4';
-              const rawSize = f.contentLength || f.content_length || f.filesize;
+              const height = f.height || 0;
               return {
-                formatId: f.itag?.toString() || f.format_id,
-                quality: f.qualityLabel || (height ? `${height}p` : '720p'),
-                ext: container,
-                sizeMB: rawSize ? (parseInt(rawSize) / (1024 * 1024)).toFixed(1) : '??',
+                formatId: f.format_id,
+                quality: f.format_note || f.resolution || (height ? `${height}p` : 'unknown'),
+                ext: f.ext || 'mp4',
+                sizeMB: f.filesize ? (f.filesize / (1024 * 1024)).toFixed(1) : (f.filesize_approx ? (f.filesize_approx / (1024 * 1024)).toFixed(1) : '??'),
                 height: height
               };
             })
-            .sort((a: any, b: any) => b.height - a.height),
-          size: 'Varies',
-          source: 'youtube'
+            .sort((a: any, b: any) => b.height - a.height) || [],
+          size: metadata.filesize ? (metadata.filesize / (1024 * 1024)).toFixed(1) : '??',
+          source: metadata.extractor
         };
-      } catch (e: any) {
-        console.warn('play-dl failed, falling back to yt-dlp:', e.message);
       }
-    }
-
-    if (!responseData) {
-      // Generic local yt-dlp fallback
-      const metadata = (await ytdl()(url, {
-        dumpJson: true,
-        noWarnings: true,
-        noPlaylist: true,
-        noCheckCertificates: true,
-        cookies: cookiePath,
-        proxy: proxy || undefined
-      })) as any;
-
-      responseData = {
-        id: metadata.id,
-        title: metadata.title,
-        author: metadata.uploader || 'Unknown',
-        thumbnail: metadata.thumbnail,
-        duration: metadata.duration_string || `${Math.floor(metadata.duration / 60)}:${(metadata.duration % 60).toString().padStart(2, '0')}`,
-        qualities: metadata.formats
-          ?.filter((f: any) => f.vcodec && f.vcodec !== 'none')
-          .map((f: any) => {
-            const height = f.height || 0;
-            return {
-              formatId: f.format_id,
-              quality: f.format_note || f.resolution || (height ? `${height}p` : 'unknown'),
-              ext: f.ext || 'mp4',
-              sizeMB: f.filesize ? (f.filesize / (1024 * 1024)).toFixed(1) : (f.filesize_approx ? (f.filesize_approx / (1024 * 1024)).toFixed(1) : '??'),
-              height: height
-            };
-          })
-          .sort((a: any, b: any) => b.height - a.height) || [],
-        size: metadata.filesize ? (metadata.filesize / (1024 * 1024)).toFixed(1) : '??',
-        source: metadata.extractor
-      };
+    } finally {
+      // Safely delete the temporary cookie file after use to prevent leaks
+      if (generatedCookieFile && fs.existsSync(generatedCookieFile)) {
+        try {
+          fs.unlinkSync(generatedCookieFile);
+          console.log(`Cleaned up temporary cookie file: ${generatedCookieFile}`);
+        } catch (err) {
+          console.error(`Failed to delete temporary cookie file: ${generatedCookieFile}`, err);
+        }
+      }
     }
 
     return NextResponse.json(responseData);

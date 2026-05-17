@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import ytdl from '@/lib/ytdlp';
 import play from 'play-dl';
 import path from 'path';
+import fs from 'fs';
 import { getRandomProxy } from '@/lib/proxy';
 import { ensurePythonEngineRunning } from '@/lib/pythonEngine';
+import { generateNetscapeCookieFile } from '@/lib/cookieManager';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://127.0.0.1:8000';
 
@@ -66,9 +68,37 @@ export async function GET(req: NextRequest) {
   }
 
   // 2. Standard Fallback local streaming
-  const cookiePath = path.resolve(process.cwd(), 'cookies.txt');
+  let cookiePath = path.resolve(process.cwd(), 'cookies.txt');
+  let generatedCookieFile: string | null = null;
 
   try {
+    const plat = url.includes('youtube.com') || url.includes('youtu.be') ? 'youtube' :
+                 url.includes('instagram.com') ? 'instagram' :
+                 url.includes('facebook.com') || url.includes('fb.watch') ? 'facebook' : null;
+
+    if (plat) {
+      generatedCookieFile = generateNetscapeCookieFile(plat);
+      if (generatedCookieFile) {
+        cookiePath = generatedCookieFile;
+        console.log(`Generated native Netscape cookie file for fallback download: ${cookiePath}`);
+      }
+    }
+
+    // Schedule safe cleanup of the temporary cookie file in the background after some delay
+    if (generatedCookieFile) {
+      const fileToDelete = generatedCookieFile;
+      setTimeout(() => {
+        if (fs.existsSync(fileToDelete)) {
+          try {
+            fs.unlinkSync(fileToDelete);
+            console.log(`Cleaned up temporary download cookie file: ${fileToDelete}`);
+          } catch (err) {
+            console.error(`Failed to delete temporary cookie file: ${fileToDelete}`, err);
+          }
+        }
+      }, 10000); // 10 seconds is extremely safe to ensure subprocess has booted and loaded it
+    }
+
     // For YouTube, try play-dl stream first as it's more direct
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
       try {

@@ -30,8 +30,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-screen flex flex-col relative overflow-x-hidden">
+      <body className="min-h-screen flex flex-col relative overflow-x-hidden" suppressHydrationWarning>
         {/* Global 3D Animated Background Blobs */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none z-0 bg-[#000000]">
           <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-blue-600/15 rounded-full mix-blend-screen filter blur-[100px] opacity-60 animate-blob" />

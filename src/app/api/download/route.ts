@@ -1,93 +1,114 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn, execSync } from 'child_process';
+import ytdl from '@/lib/ytdlp';
+import play from 'play-dl';
 import path from 'path';
-import os from 'os';
-import { createReadStream, statSync, unlinkSync, existsSync } from 'fs';
+import { getRandomProxy } from '@/lib/proxy';
 
-const ytDlpCmd = process.platform === 'win32' ? '.\\yt-dlp.exe' : 'yt-dlp';
-let ffmpegAvailable = true;
-try {
-  execSync('ffmpeg -version', { stdio: 'ignore' });
-} catch {
-  ffmpegAvailable = false;
-}
+const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://127.0.0.1:8000';
 
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get('url');
-  const formatId = req.nextUrl.searchParams.get('formatId') || 'best';
-  const rawTitle = req.nextUrl.searchParams.get('title') || 'SaveX_Download';
-  const cleanTitle = rawTitle.replace(/[^a-zA-Z0-9 ]/g, "").trim().substring(0, 60);
+  const itag = req.nextUrl.searchParams.get('formatId') || 'best';
+  const title = req.nextUrl.searchParams.get('title') || 'video';
+  const proxy = getRandomProxy();
 
   if (!url) {
-    return new NextResponse('Invalid or missing URL', { status: 400 });
+    return NextResponse.json({ error: 'Missing URL' }, { status: 400 });
   }
 
-  const isAudioOnly = formatId === 'bestaudio';
-  const requiresMerge = !isAudioOnly && formatId.includes('+');
-  const ext = isAudioOnly ? 'mp3' : 'mp4';
-  const tempFilePath = path.join(os.tmpdir(), `savex-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`);
+  // 1. Try to delegate stream to Python Secure Session Engine first
+  try {
+    console.log(`Routing stream download for ${url} to Python Secure Session Engine...`);
+    const pyStreamUrl = `${PYTHON_API_URL}/api/download?url=${encodeURIComponent(url)}&formatId=${encodeURIComponent(itag)}&title=${encodeURIComponent(title)}`;
+    const pyResponse = await fetch(pyStreamUrl);
 
-  if (requiresMerge && !ffmpegAvailable) {
-    return new NextResponse('This video requires ffmpeg to merge audio and video for high-resolution downloads. Please install ffmpeg and try again.', { status: 400 });
+    if (pyResponse.ok && pyResponse.body) {
+      console.log(`Python Session Engine successfully streaming video: ${title}`);
+      
+      const headers = new Headers();
+      
+      // Forward standard HTTP headers exactly as returned from Python backend
+      const contentDisposition = pyResponse.headers.get('Content-Disposition');
+      const contentType = pyResponse.headers.get('Content-Type');
+      const contentLength = pyResponse.headers.get('Content-Length');
+
+      if (contentDisposition) {
+        headers.set('Content-Disposition', contentDisposition);
+      } else {
+        headers.set('Content-Disposition', `attachment; filename="${title}.mp4"`);
+      }
+      
+      if (contentType) {
+        headers.set('Content-Type', contentType);
+      } else {
+        headers.set('Content-Type', 'video/mp4');
+      }
+      
+      if (contentLength) {
+        headers.set('Content-Length', contentLength);
+      } else {
+        headers.set('Transfer-Encoding', 'chunked');
+      }
+      
+      headers.set('Cache-Control', 'no-store');
+
+      return new NextResponse(pyResponse.body as any, {
+        status: 200,
+        headers
+      });
+    } else {
+      console.warn('Python Session Engine returned error stream, falling back to standard streaming...');
+    }
+  } catch (e: any) {
+    console.warn('Python Session Engine is offline or streaming failed. Falling back to local node streaming...', e.message);
   }
+
+  // 2. Standard Fallback local streaming
+  const cookiePath = path.resolve(process.cwd(), 'cookies.txt');
 
   try {
-    // 1. Download and mux to a temporary file
-    await new Promise((resolve, reject) => {
-      const args = ['-f', formatId, '-o', tempFilePath, '--no-warnings', url];
-      
-      if (isAudioOnly) {
-        args.push('--extract-audio', '--audio-format', 'mp3');
-      } else if (requiresMerge) {
-        args.push('--merge-output-format', 'mp4');
-      }
+    // For YouTube, try play-dl stream first as it's more direct
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      try {
+        await play.setToken({
+          youtube: { cookie: cookiePath }
+        });
 
-      const ytDlp = spawn(ytDlpCmd, args);
-      
-      ytDlp.stderr.on('data', (data) => console.error(`[yt-dlp]: ${data.toString()}`));
-      
-      ytDlp.on('close', (code) => {
-        if (code === 0 && existsSync(tempFilePath)) {
-          resolve(true);
-        } else {
-          reject(new Error(`yt-dlp exited with code ${code}`));
-        }
-      });
+        const stream = await play.stream(url, {
+          quality: itag.includes('audio') ? 0 : 1,
+          proxies: proxy ? [proxy] : undefined
+        } as any);
+        const headers = new Headers();
+        headers.set('Content-Disposition', `attachment; filename="${title}.mp4"`);
+        headers.set('Content-Type', 'video/mp4');
+        return new NextResponse(stream.stream as any, { headers });
+      } catch (e) {
+        console.warn('play-dl stream failed, falling back to yt-dlp');
+      }
+    }
+
+    // Generic yt-dlp streaming fallback
+    const subprocess = ytdl().exec(url, {
+      format: itag,
+      output: '-',
+      noWarnings: true,
+      noCheckCertificates: true,
+      cookies: cookiePath,
+      proxy: proxy || undefined
     });
 
-    // 2. Stream the completed file back to the browser
-    const stat = statSync(tempFilePath);
-    const fileStream = createReadStream(tempFilePath);
+    const headers = new Headers();
+    const sanitizedTitle = title.replace(/[^a-zA-Z0-9]/g, '_');
+    headers.set('Content-Disposition', `attachment; filename="${sanitizedTitle}.mp4"`);
+    headers.set('Content-Type', 'video/mp4');
 
-    const webStream = new ReadableStream({
-      start(controller) {
-        fileStream.on('data', (chunk) => controller.enqueue(chunk));
-        fileStream.on('end', () => {
-          controller.close();
-          try { unlinkSync(tempFilePath); } catch (e) {} // Cleanup
-        });
-        fileStream.on('error', (err) => {
-          controller.error(err);
-          try { unlinkSync(tempFilePath); } catch (e) {} // Cleanup
-        });
-      },
-      cancel() {
-        fileStream.destroy();
-        try { unlinkSync(tempFilePath); } catch (e) {} // Cleanup
-      }
-    });
-
-    return new NextResponse(webStream, {
-      headers: {
-        'Content-Disposition': `attachment; filename="${cleanTitle}.${ext}"`,
-        'Content-Type': isAudioOnly ? 'audio/mpeg' : 'video/mp4',
-        'Content-Length': stat.size.toString(),
-      },
+    return new NextResponse(subprocess.stdout as any, {
+      status: 200,
+      headers
     });
 
   } catch (err: any) {
-    console.error("Download Error:", err);
-    try { if (existsSync(tempFilePath)) unlinkSync(tempFilePath); } catch (e) {}
-    return new NextResponse('Error downloading media.', { status: 500 });
+    console.error('Download error:', err);
+    return NextResponse.json({ error: 'Failed to download video. Please try a different format or URL.' }, { status: 500 });
   }
 }

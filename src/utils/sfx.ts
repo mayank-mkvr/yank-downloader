@@ -7,16 +7,16 @@ export const playPop = () => {
     osc.connect(gain);
     gain.connect(ctx.destination);
     
-    // Apple-style subtle tap sound
+    // Sleek iOS premium subtle tap sound (very quiet, dampened, high-end)
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(800, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.05);
+    osc.frequency.setValueAtTime(450, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.04);
     
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+    gain.gain.setValueAtTime(0.06, ctx.currentTime); // Gentle and premium volume
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
     
     osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.05);
+    osc.stop(ctx.currentTime + 0.04);
   } catch(e) {}
 };
 
@@ -29,15 +29,15 @@ export const playSuccess = () => {
     osc.connect(gain);
     gain.connect(ctx.destination);
     
-    // Apple-style pleasant chime
+    // Luxurious soft crystal chime (pleasant chord sequence)
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(400, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.1);
+    osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5 chord node
+    osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.08); // E5 chord node
     
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.05, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
     
     osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.2);
+    osc.stop(ctx.currentTime + 0.25);
   } catch(e) {}
 };

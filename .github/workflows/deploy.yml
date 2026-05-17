@@ -1,4 +1,4 @@
-name: Build and push Docker image
+name: Build, test, and deploy
 
 on:
   push:
@@ -12,10 +12,44 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 20
-      - run: npm ci
-      - run: npm run build
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Build frontend
+        run: npm run build
+      - name: Install backend dependencies
+        run: |
+          cd server
+          npm ci
+      - name: Build backend
+        run: |
+          cd server
+          npm run build
       - uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/ytdownloader:latest
+          tags: ghcr.io/${{ github.repository_owner }}/ytdownloader-frontend:latest
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/ytdownloader-backend:latest
+
+  deploy:
+    if: secrets.RENDER_API_KEY && secrets.RENDER_SERVICE_IDS
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SERVICE_IDS: ${{ secrets.RENDER_SERVICE_IDS }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trigger Render deploys
+        run: |
+          for service in $RENDER_SERVICE_IDS; do
+            echo "Triggering deploy for Render service: $service"
+            curl -X POST "https://api.render.com/v1/services/$service/deploys" \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"clearCache": false}'
+          done

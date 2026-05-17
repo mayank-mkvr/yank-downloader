@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: ytdownloader-frontend
+    env: docker
+    branch: main
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BACKEND_URL
+        value: http://ytdownloader-backend:4000
+  - type: service
+    name: ytdownloader-backend
+    env: docker
+    branch: main
+    dockerfilePath: ./server/Dockerfile
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "4000"
+      - key: REDIS_HOST
+        value: redis
+      - key: REDIS_PORT
+        value: "6379"
+      - key: ALLOWED_ORIGINS
+        value: https://yank-dl.web.app
+  - type: redis
+    name: redis
+    plan: starter

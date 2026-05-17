@@ -74,13 +74,18 @@ export async function POST(req: NextRequest) {
           thumbnail: info.video_details.thumbnails[0]?.url || '',
           duration: info.video_details.durationRaw || `${Math.floor(info.video_details.durationInSec / 60)}:${(info.video_details.durationInSec % 60).toString().padStart(2, '0')}`,
           qualities: info.format
-            .filter((f: any) => f.container === 'mp4' || f.hasVideo)
-            .map((f: any) => ({
-              formatId: f.itag?.toString() || f.format_id,
-              quality: f.quality_label || f.resolution || '720p',
-              ext: 'mp4',
-              sizeMB: f.content_length ? (parseInt(f.content_length) / (1024 * 1024)).toFixed(1) : (f.filesize ? (f.filesize / (1024 * 1024)).toFixed(1) : '??')
-            })),
+            .filter((f: any) => f.hasVideo)
+            .map((f: any) => {
+              const height = f.height || (f.quality_label ? parseInt(f.quality_label) : 0);
+              return {
+                formatId: f.itag?.toString() || f.format_id,
+                quality: f.quality_label || (height ? `${height}p` : '720p'),
+                ext: f.container || 'mp4',
+                sizeMB: f.content_length ? (parseInt(f.content_length) / (1024 * 1024)).toFixed(1) : (f.filesize ? (f.filesize / (1024 * 1024)).toFixed(1) : '??'),
+                height: height
+              };
+            })
+            .sort((a: any, b: any) => b.height - a.height),
           size: 'Varies',
           source: 'youtube'
         };
@@ -107,13 +112,18 @@ export async function POST(req: NextRequest) {
         thumbnail: metadata.thumbnail,
         duration: metadata.duration_string || `${Math.floor(metadata.duration / 60)}:${(metadata.duration % 60).toString().padStart(2, '0')}`,
         qualities: metadata.formats
-          ?.filter((f: any) => f.ext === 'mp4' || f.vcodec !== 'none')
-          .map((f: any) => ({
-            formatId: f.format_id,
-            quality: f.format_note || f.resolution || 'unknown',
-            ext: f.ext,
-            sizeMB: f.filesize ? (f.filesize / (1024 * 1024)).toFixed(1) : (f.filesize_approx ? (f.filesize_approx / (1024 * 1024)).toFixed(1) : '??')
-          })) || [],
+          ?.filter((f: any) => f.vcodec && f.vcodec !== 'none')
+          .map((f: any) => {
+            const height = f.height || 0;
+            return {
+              formatId: f.format_id,
+              quality: f.format_note || f.resolution || (height ? `${height}p` : 'unknown'),
+              ext: f.ext || 'mp4',
+              sizeMB: f.filesize ? (f.filesize / (1024 * 1024)).toFixed(1) : (f.filesize_approx ? (f.filesize_approx / (1024 * 1024)).toFixed(1) : '??'),
+              height: height
+            };
+          })
+          .sort((a: any, b: any) => b.height - a.height) || [],
         size: metadata.filesize ? (metadata.filesize / (1024 * 1024)).toFixed(1) : '??',
         source: metadata.extractor
       };

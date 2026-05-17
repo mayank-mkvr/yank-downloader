@@ -230,12 +230,15 @@ def analyze_video(payload: AnalyzeRequest):
                 "--no-warnings",
                 "--no-playlist",
                 "--no-check-certificate",
-                "--socket-timeout", "15",
+                "--socket-timeout", "5",
+                "--retries", "1",
+                "--extractor-retries", "1",
+                "--youtube-skip-dash-manifest",
                 url
             ]
             if cookie_file_path:
                 args.extend(["--cookies", cookie_file_path])
-            result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=25)
+            result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=40)
             
             if result.returncode != 0 and cookie_file_path:
                 logger.warning("YouTube CLI extraction with cookies failed. Retrying WITHOUT cookies...")
@@ -246,10 +249,13 @@ def analyze_video(payload: AnalyzeRequest):
                     "--no-warnings",
                     "--no-playlist",
                     "--no-check-certificate",
-                    "--socket-timeout", "15",
+                    "--socket-timeout", "5",
+                    "--retries", "1",
+                    "--extractor-retries", "1",
+                    "--youtube-skip-dash-manifest",
                     url
                 ]
-                result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=25)
+                result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=40)
                 
             if result.returncode != 0:
                 error_msg = result.stderr.strip() or "Unknown error extracting YouTube metadata"

@@ -3,7 +3,7 @@ FROM node:20-slim
 # Install system dependencies and yt-dlp
 RUN apt-get update \
   && apt-get install -y python3 python3-pip ffmpeg ca-certificates --no-install-recommends \
-  && python3 -m pip install --no-cache-dir yt-dlp \
+  && python3 -m pip install --break-system-packages --no-cache-dir yt-dlp fastapi uvicorn pydantic requests cryptography \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

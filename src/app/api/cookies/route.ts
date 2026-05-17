@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ensurePythonEngineRunning } from '@/lib/pythonEngine';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://127.0.0.1:8000';
 
 export async function GET(req: NextRequest) {
   try {
+    await ensurePythonEngineRunning();
     const response = await fetch(`${PYTHON_API_URL}/api/cookies/status`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -23,6 +25,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await ensurePythonEngineRunning();
     const body = await req.json();
     const { action, platform, cookieData } = body;
 

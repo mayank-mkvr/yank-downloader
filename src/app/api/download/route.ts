@@ -3,6 +3,7 @@ import ytdl from '@/lib/ytdlp';
 import play from 'play-dl';
 import path from 'path';
 import { getRandomProxy } from '@/lib/proxy';
+import { ensurePythonEngineRunning } from '@/lib/pythonEngine';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://127.0.0.1:8000';
 
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
 
   // 1. Try to delegate stream to Python Secure Session Engine first
   try {
+    await ensurePythonEngineRunning();
     console.log(`Routing stream download for ${url} to Python Secure Session Engine...`);
     const pyStreamUrl = `${PYTHON_API_URL}/api/download?url=${encodeURIComponent(url)}&formatId=${encodeURIComponent(itag)}&title=${encodeURIComponent(title)}`;
     const pyResponse = await fetch(pyStreamUrl);

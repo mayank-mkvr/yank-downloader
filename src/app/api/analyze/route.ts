@@ -3,6 +3,7 @@ import ytdl from '@/lib/ytdlp';
 import play from 'play-dl';
 import path from 'path';
 import { getRandomProxy } from '@/lib/proxy';
+import { ensurePythonEngineRunning } from '@/lib/pythonEngine';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://127.0.0.1:8000';
 
@@ -17,6 +18,7 @@ export async function POST(req: NextRequest) {
 
     // 1. Try to delegate to Python Secure Session Engine first
     try {
+      await ensurePythonEngineRunning();
       console.log(`Routing analysis for ${url} to Python Secure Session Engine...`);
       const pyResponse = await fetch(`${PYTHON_API_URL}/api/analyze`, {
         method: 'POST',

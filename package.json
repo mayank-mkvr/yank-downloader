@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "python3 -m pip install -r python/requirements.txt || pip3 install -r python/requirements.txt || pip install -r python/requirements.txt || echo 'Pip install ignored'; next build",
     "start": "next start",
     "lint": "eslint"
   },

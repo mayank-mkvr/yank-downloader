@@ -18,13 +18,15 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "youtube-dl-exec": "^3.1.6",
-    "youtube-ext": "^1.1.25"
+    "youtube-ext": "^1.1.25",
+    "youtubei.js": "^17.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",

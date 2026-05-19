@@ -9,7 +9,8 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --production
+# Install all dependencies (including devDependencies) so next build compiles CSS, Tailwind, TypeScript, etc.
+RUN npm install
 
 COPY . ./
 RUN npm run build

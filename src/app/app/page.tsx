@@ -17,6 +17,31 @@ export default function DownloaderApp() {
     if (saved === "true") setAlwaysAllow(true);
   }, []);
 
+  // Debounced auto-extractor: triggers analysis instantly when a URL is pasted
+  useEffect(() => {
+    if (!url || isProcessing || (videoData && videoData.originalUrl === url)) return;
+
+    const lowerUrl = url.toLowerCase().trim();
+    const isHttp = lowerUrl.startsWith("http://") || lowerUrl.startsWith("https://");
+
+    if (isHttp && lowerUrl.length > 12) {
+      // Validate platform constraints to prevent wrong-tab false triggers
+      const platMatch = 
+        (activeTab === 'youtube' && (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be'))) ||
+        (activeTab === 'instagram' && lowerUrl.includes('instagram.com')) ||
+        (activeTab === 'facebook' && (lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.watch') || lowerUrl.includes('fb.gg'))) ||
+        (activeTab === 'onedrive' && (lowerUrl.includes('onedrive.live.com') || lowerUrl.includes('onedrive') || lowerUrl.includes('sharepoint.com'))) ||
+        (activeTab === 'telegram' && (lowerUrl.includes('t.me') || lowerUrl.includes('telegram.me')));
+
+      if (platMatch) {
+        const delayDebounceFn = setTimeout(() => {
+          handleProcessUrl();
+        }, 500); // 500ms debounce
+        return () => clearTimeout(delayDebounceFn);
+      }
+    }
+  }, [url, activeTab, isProcessing, videoData]);
+
   const toggleAlwaysAllow = () => {
     const newVal = !alwaysAllow;
     setAlwaysAllow(newVal);
@@ -73,7 +98,7 @@ export default function DownloaderApp() {
 
       if (response.ok) {
         playSuccess();
-        setVideoData(data);
+        setVideoData({ ...data, originalUrl: url });
       } else {
         alert(data.error || 'Failed to fetch video data');
       }

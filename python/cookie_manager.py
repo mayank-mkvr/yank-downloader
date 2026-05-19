@@ -73,36 +73,103 @@ def redact_cookie_value(name: str, value: str) -> str:
     return f"{value[:3]}...{value[-3:]} ({len(value)} chars)"
 
 def encrypt_cookies(raw_data: str) -> bytes:
-    """Encrypts a raw string containing cookies using Fernet AES-256 or secure fallback."""
+    """Encrypts a raw string containing cookies using AES-256-CBC format (aligned with Node.js) or secure fallback."""
     if not raw_data:
         return b""
         
+    # Derive a 32-byte key
+    key = ENCRYPTION_KEY
+    if len(key) == 44:
+        try:
+            key = base64.urlsafe_b64decode(key)
+        except Exception:
+            pass
+    if len(key) != 32:
+        import hashlib
+        key = hashlib.sha256(key).digest()
+
+    if CRYPTOGRAPHY_AVAILABLE:
+        try:
+            iv = os.urandom(16)
+            # Add PKCS7 padding
+            pad_len = 16 - (len(raw_data) % 16)
+            padded_data = raw_data + chr(pad_len) * pad_len
+            
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+            encryptor = cipher.encryptor()
+            ciphertext = encryptor.update(padded_data.encode('utf-8')) + encryptor.finalize()
+            
+            # Format identical to Node.js: iv_hex:ciphertext_hex
+            result = iv.hex() + ":" + ciphertext.hex()
+            return result.encode('utf-8')
+        except Exception as e:
+            logger.error(f"AES-256-CBC encryption failed: {e}. Falling back to legacy Fernet.")
+
     if CRYPTOGRAPHY_AVAILABLE:
         f = Fernet(ENCRYPTION_KEY if len(ENCRYPTION_KEY) == 44 else base64.urlsafe_b64encode(ENCRYPTION_KEY.ljust(32)[:32]))
         return f.encrypt(raw_data.encode("utf-8"))
     else:
         # Secure fallback XOR with derived key stream
-        # This is a safe fallback to ensure service runs when library is missing,
-        # but outputs a warning asking to install cryptography.
         data_bytes = raw_data.encode("utf-8")
         key_stream = ENCRYPTION_KEY * (len(data_bytes) // len(ENCRYPTION_KEY) + 1)
         cipher_bytes = bytes([b ^ k for b, k in zip(data_bytes, key_stream)])
         return base64.urlsafe_b64encode(cipher_bytes)
 
 def decrypt_cookies(encrypted_data: bytes) -> str:
-    """Decrypts encrypted cookie bytes back to raw string."""
+    """Decrypts encrypted cookie bytes back to raw string. Aligned with Node.js format with robust fallbacks."""
     if not encrypted_data:
         return ""
         
+    # Derive a 32-byte key
+    key = ENCRYPTION_KEY
+    if len(key) == 44:
+        try:
+            key = base64.urlsafe_b64decode(key)
+        except Exception:
+            pass
+    if len(key) != 32:
+        import hashlib
+        key = hashlib.sha256(key).digest()
+
+    data_str = encrypted_data.decode('utf-8', errors='ignore').strip()
+    
+    # Try AES-256-CBC first if format is iv_hex:ciphertext_hex
+    if CRYPTOGRAPHY_AVAILABLE and ":" in data_str:
+        try:
+            parts = data_str.split(":")
+            iv = bytes.fromhex(parts[0])
+            ciphertext = bytes.fromhex(parts[1])
+            
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+            decryptor = cipher.decryptor()
+            padded_data = decryptor.update(ciphertext) + decryptor.finalize()
+            
+            # Remove PKCS7 padding
+            pad_len = padded_data[-1]
+            if 1 <= pad_len <= 16:
+                # verify padding content
+                if all(val == pad_len for val in padded_data[-pad_len:]):
+                    return padded_data[:-pad_len].decode('utf-8')
+            return padded_data.decode('utf-8')
+        except Exception as e:
+            logger.warning(f"AES-256-CBC decryption failed: {e}. Trying legacy/XOR decryption.")
+
+    # Try legacy Fernet decryption
     if CRYPTOGRAPHY_AVAILABLE:
-        f = Fernet(ENCRYPTION_KEY if len(ENCRYPTION_KEY) == 44 else base64.urlsafe_b64encode(ENCRYPTION_KEY.ljust(32)[:32]))
-        return f.decrypt(encrypted_data).decode("utf-8")
-    else:
-        # Decrypt secure fallback XOR
+        try:
+            f = Fernet(ENCRYPTION_KEY if len(ENCRYPTION_KEY) == 44 else base64.urlsafe_b64encode(ENCRYPTION_KEY.ljust(32)[:32]))
+            return f.decrypt(encrypted_data).decode("utf-8")
+        except Exception:
+            pass
+            
+    # Try XOR decryption fallback
+    try:
         cipher_bytes = base64.urlsafe_b64decode(encrypted_data)
         key_stream = ENCRYPTION_KEY * (len(cipher_bytes) // len(ENCRYPTION_KEY) + 1)
         raw_bytes = bytes([b ^ k for b, k in zip(cipher_bytes, key_stream)])
         return raw_bytes.decode("utf-8")
+    except Exception:
+        return ""
 
 def parse_cookie_string(cookie_str: str) -> List[Dict]:
     """

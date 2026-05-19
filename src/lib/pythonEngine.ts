@@ -21,6 +21,12 @@ async function checkHealth(): Promise<boolean> {
 }
 
 export async function ensurePythonEngineRunning(): Promise<boolean> {
+  const isServerless = !!(process.env.K_SERVICE || process.env.FUNCTION_NAME || process.env.FIREBASE_CONFIG || process.env.FUNCTIONS_EMULATOR);
+  if (isServerless) {
+    // In serverless environments like Firebase Cloud Functions, background daemons cannot run
+    return false;
+  }
+
   if (isKnownRunning) {
     return true;
   }
@@ -57,7 +63,8 @@ export async function ensurePythonEngineRunning(): Promise<boolean> {
         const child = spawn(cmd, [appPath], {
           detached: true,
           stdio: 'ignore',
-          cwd: process.cwd()
+          cwd: process.cwd(),
+          windowsHide: true
         });
 
         child.unref();

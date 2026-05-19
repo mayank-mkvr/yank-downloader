@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { getRandomProxy } from '@/lib/proxy';
 import { ensurePythonEngineRunning } from '@/lib/pythonEngine';
-import { generateNetscapeCookieFile } from '@/lib/cookieManager';
+import { generateNetscapeCookieFile, getCookiesForPlatform } from '@/lib/cookieManager';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://127.0.0.1:8000';
 
@@ -68,6 +68,64 @@ export async function GET(req: NextRequest) {
   }
 
   // 2. Standard Fallback local streaming
+  // Try Cobalt redirect first for serverless / non-YouTube downloads (high speed, zero memory cost)
+  const isServerless = !!(process.env.K_SERVICE || process.env.FUNCTION_NAME || process.env.FIREBASE_CONFIG || process.env.FUNCTIONS_EMULATOR);
+  const isYoutube = url.includes('youtube.com') || url.includes('youtu.be');
+
+  if (isServerless || !isYoutube) {
+    try {
+      console.log(`[Download Route] Serverless/non-YT detected. Fetching high-speed streaming link from Cobalt for: ${url}`);
+      const cobaltInstances = [
+        'https://api.cobalt.tools/',
+        'https://cobalt.api.ryzetech.live/',
+        'https://co.wuk.sh/',
+        'https://cobalt.instavids.workers.dev/'
+      ];
+
+      let cobaltStreamUrl = '';
+      for (const instance of cobaltInstances) {
+        try {
+          const controller = new AbortController();
+          const id = setTimeout(() => controller.abort(), 6000);
+
+          const isAudio = itag.includes('audio') || itag.includes('mp3') || itag.includes('bestaudio');
+          const res = await fetch(instance, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            body: JSON.stringify({
+              url: url,
+              videoQuality: '720',
+              downloadMode: isAudio ? 'audio' : 'auto',
+              filenameStyle: 'basic'
+            }),
+            signal: controller.signal
+          });
+          clearTimeout(id);
+
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (data.status === 'stream' || data.status === 'redirect') {
+            cobaltStreamUrl = data.url;
+            break;
+          }
+        } catch (e) {
+          // ignore instance failure
+        }
+      }
+
+      if (cobaltStreamUrl) {
+        console.log(`[Download Route] Directing client to Cobalt direct high-speed stream: ${cobaltStreamUrl}`);
+        return NextResponse.redirect(new URL(cobaltStreamUrl));
+      }
+    } catch (e: any) {
+      console.warn('[Download Route] Serverless Cobalt redirect failed:', e.message);
+    }
+  }
+
   let cookiePath = path.resolve(process.cwd(), 'cookies.txt');
   let generatedCookieFile: string | null = null;
 
@@ -99,23 +157,72 @@ export async function GET(req: NextRequest) {
       }, 10000); // 10 seconds is extremely safe to ensure subprocess has booted and loaded it
     }
 
-    // For YouTube, try play-dl stream first as it's more direct
+    // For YouTube, try youtubei.js stream first as it's highly robust
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
       try {
-        await play.setToken({
-          youtube: { cookie: cookiePath }
-        });
+        console.log(`[Download Route] Using Innertube (youtubei.js) to stream YouTube video...`);
+        const { Innertube, Platform } = require('youtubei.js');
+        
+        // Provide the custom JavaScript interpreter
+        Platform.shim.eval = (code: any) => {
+          const codeStr = typeof code === 'string' ? code : (code.code || code.output || code.toString());
+          return new Function(codeStr)();
+        };
 
-        const stream = await play.stream(url, {
-          quality: itag.includes('audio') ? 0 : 1,
-          proxies: proxy ? [proxy] : undefined
-        } as any);
+        const cookies = getCookiesForPlatform('youtube');
+        let cookieString = '';
+        if (cookies && cookies.length > 0) {
+          cookieString = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+          console.log(`[Innertube Stream] Loaded ${cookies.length} YouTube cookies from secure storage`);
+        }
+
+         const yt = await Innertube.create({
+           cookie: cookieString || undefined
+         });
+
+        // Resolve YouTube video ID
+        const getYouTubeId = (urlStr: string) => {
+          const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+          const match = urlStr.match(regExp);
+          return (match && match[2].length === 11) ? match[2] : null;
+        };
+        
+        const videoId = getYouTubeId(url);
+        if (!videoId) {
+          throw new Error('Could not parse YouTube video ID from URL');
+        }
+
+        console.log(`[Innertube Stream] Initiating download stream for video ID: ${videoId}, itag: ${itag}`);
+        
+        const isAudio = itag === 'bestaudio' || itag.includes('audio') || itag.includes('mp3');
+        const streamOptions: any = {};
+        
+        if (isAudio) {
+          streamOptions.type = 'audio';
+          streamOptions.quality = 'best';
+        } else if (itag && itag !== 'best') {
+          streamOptions.itag = parseInt(itag);
+        } else {
+          streamOptions.type = 'video+audio';
+          streamOptions.quality = 'best';
+        }
+
+        const stream = await yt.download(videoId, streamOptions);
+        console.log('[Innertube Stream] Stream successfully generated from YouTube CDN!');
+
         const headers = new Headers();
-        headers.set('Content-Disposition', `attachment; filename="${title}.mp4"`);
-        headers.set('Content-Type', 'video/mp4');
-        return new NextResponse(stream.stream as any, { headers });
-      } catch (e) {
-        console.warn('play-dl stream failed, falling back to yt-dlp');
+        const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_') || 'video';
+        const ext = isAudio ? 'mp3' : 'mp4';
+        headers.set('Content-Disposition', `attachment; filename="${cleanTitle}.${ext}"`);
+        headers.set('Content-Type', isAudio ? 'audio/mpeg' : 'video/mp4');
+        headers.set('Cache-Control', 'no-store');
+
+        return new Response(stream, {
+          status: 200,
+          headers
+        });
+      } catch (e: any) {
+        console.warn('youtubei.js stream failed, falling back to other methods:', e.message);
       }
     }
 
@@ -127,6 +234,8 @@ export async function GET(req: NextRequest) {
       noCheckCertificates: true,
       cookies: cookiePath,
       proxy: proxy || undefined
+    }, {
+      windowsHide: true
     });
 
     const headers = new Headers();

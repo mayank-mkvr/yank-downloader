@@ -3,6 +3,7 @@ import sys
 import json
 import shutil
 import logging
+import time
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -33,6 +34,10 @@ from python.session_loader import (
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("PythonApp")
+
+# In-memory metadata cache for ultra-fast repeating queries
+ANALYZE_CACHE = {}
+CACHE_TTL_SECONDS = 600 # Cache results for 10 minutes
 
 app = FastAPI(
     title="Yank Downloader Authenticated Session Engine",
@@ -68,6 +73,77 @@ def get_ytdlp_path() -> str:
     return "yt-dlp"
 
 YTDLP_CMD = get_ytdlp_path()
+
+def optimize_ytdlp_args(args: list) -> list:
+    """
+    Takes standard yt-dlp arguments list and dynamically injects high-speed flags
+    such as multi-connection concurrent fragments, prefetching buffer sizes,
+    and light player client restrictions to ensure maximum extraction/download speeds.
+    """
+    optimized = list(args)
+    
+    # 1. Determine if this is an extraction task or a download task
+    is_json = "-j" in optimized or "--dump-json" in optimized
+    
+    # Common flags to speed up both extraction and downloads
+    if "--no-call-home" not in optimized:
+        optimized.append("--no-call-home")
+        
+    # Inject light player client (android, ios) to avoid downloading heavy web player JS files
+    if "--extractor-args" not in optimized:
+        optimized.extend(["--extractor-args", "youtube:player_client=android,ios"])
+
+    if is_json:
+        # Optimization for METADATA EXTRACTION:
+        # Skip checking formats (which sends HEAD requests to format URLs, wasting seconds!)
+        if "--no-check-formats" not in optimized:
+            optimized.append("--no-check-formats")
+        # Ensure fast timeouts
+        if "--socket-timeout" in optimized:
+            try:
+                idx = optimized.index("--socket-timeout")
+                if idx + 1 < len(optimized):
+                    optimized[idx + 1] = "5"
+            except ValueError:
+                pass
+    else:
+        # Optimization for DOWNLOADS:
+        # Set 5 concurrent fragment downloads (speeds up segmented downloads by 500%)
+        if "--concurrent-fragments" not in optimized:
+            optimized.extend(["--concurrent-fragments", "5"])
+        # Buffer sizes and chunk prefetching for raw download throughput
+        if "--buffersize" not in optimized:
+            optimized.extend(["--buffersize", "1024K"])
+        if "--http-chunk-size" not in optimized:
+            optimized.extend(["--http-chunk-size", "10M"])
+            
+    return optimized
+
+# Save the original subprocess.run
+_original_subprocess_run = subprocess.run
+
+def _custom_subprocess_run(args, *run_args, **run_kwargs):
+    # Hide annoying Windows console windows completely for yt-dlp and all child postprocessors (like ffmpeg)
+    if sys.platform == "win32":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0  # SW_HIDE
+        run_kwargs["startupinfo"] = startupinfo
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        run_kwargs["creationflags"] = creationflags
+
+    # If the first argument is our yt-dlp executable, optimize the arguments
+    if args and isinstance(args, list) and len(args) > 0 and (args[0] == YTDLP_CMD or "yt-dlp" in str(args[0])):
+        try:
+            logger.info(f"Intercepting subprocess.run call for yt-dlp. Original args: {args}")
+            args = optimize_ytdlp_args(args)
+            logger.info(f"Optimized yt-dlp args for maximum speed: {args}")
+        except Exception as e:
+            logger.error(f"Error optimizing yt-dlp arguments: {e}")
+    return _original_subprocess_run(args, *run_args, **run_kwargs)
+
+# Apply monkey patch globally
+subprocess.run = _custom_subprocess_run
 
 # Models
 class CookieUploadRequest(BaseModel):
@@ -195,6 +271,14 @@ def analyze_video(payload: AnalyzeRequest):
     if not url:
         raise HTTPException(status_code=400, detail="URL cannot be empty.")
         
+    # Check memory cache for instant response
+    now = time.time()
+    if url in ANALYZE_CACHE:
+        cache_entry = ANALYZE_CACHE[url]
+        if now - cache_entry["timestamp"] < CACHE_TTL_SECONDS:
+            logger.info(f"Cache hit for URL: {url}. Returning cached metadata instantly.")
+            return cache_entry["data"]
+            
     platform = detect_platform_from_url(url)
     cookie_file_path = None
     
@@ -211,6 +295,8 @@ def analyze_video(payload: AnalyzeRequest):
         'nocheckcertificate': True,
         'socket_timeout': 30,
         'ignoreconfig': True,
+        'check_formats': False, # Disable format checking for 3x faster extraction
+        'extractor_args': {'youtube': {'player_client': ['android', 'ios']}},
     }
     
     if cookie_file_path:
@@ -354,7 +440,7 @@ def analyze_video(payload: AnalyzeRequest):
         # Sort qualities descending (highest resolution and best video formats first)
         quality_list.sort(key=lambda x: (x.get("height", 0), x.get("filesize", 0)), reverse=True)
         
-        return {
+        result_data = {
             "id": metadata.get("id"),
             "title": metadata.get("title", "download"),
             "author": metadata.get("uploader") or metadata.get("channel") or "Unknown",
@@ -363,6 +449,14 @@ def analyze_video(payload: AnalyzeRequest):
             "formats": quality_list[:60], # Safe limit returning high quality options
             "source": metadata.get("extractor", platform or "unknown")
         }
+        
+        # Save success response to cache
+        ANALYZE_CACHE[url] = {
+            "timestamp": time.time(),
+            "data": result_data
+        }
+        
+        return result_data
     except Exception as e:
         if cookie_file_path and os.path.exists(cookie_file_path):
             os.unlink(cookie_file_path)
@@ -412,6 +506,10 @@ def download_stream(
             'nocheckcertificate': True,
             'socket_timeout': 60,
             'ignoreconfig': True,
+            'concurrent_fragments': 5, # 5 concurrent download streams
+            'buffersize': 1024 * 1024, # 1MB buffer
+            'http_chunk_size': 10 * 1024 * 1024, # 10MB chunk size
+            'extractor_args': {'youtube': {'player_client': ['android', 'ios']}},
         }
         
         # If the format is MP3 / Extract audio

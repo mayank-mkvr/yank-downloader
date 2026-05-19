@@ -29,7 +29,20 @@ const getKey = (): Buffer => {
   
   const keyFile = path.join(STORAGE_DIR, '.key');
   if (fs.existsSync(keyFile)) {
-    return fs.readFileSync(keyFile);
+    const raw = fs.readFileSync(keyFile);
+    // If the key is base64 encoded (length 44 or contains base64 chars)
+    if (raw.length === 44) {
+      const decoded = Buffer.from(raw.toString('utf8').trim(), 'base64');
+      if (decoded.length === 32) {
+        return decoded;
+      }
+    }
+    // If it's already a 32-byte raw binary buffer
+    if (raw.length === 32) {
+      return raw;
+    }
+    // Fallback: derive 32-byte key from whatever length it is
+    return crypto.scryptSync(raw.toString('utf8'), 'salt', 32);
   }
   
   const newKey = crypto.randomBytes(32);

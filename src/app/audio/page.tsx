@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link as LinkIcon, Music, Search, SlidersHorizontal, Download } from "lucide-react";
 import { playPop, playSuccess } from "@/utils/sfx";
 
@@ -9,6 +9,21 @@ export default function AudioDownloader() {
   const [quality, setQuality] = useState("320");
   const [isProcessing, setIsProcessing] = useState(false);
   const [audioData, setAudioData] = useState<any>(null);
+
+  // Debounced auto-extractor: triggers analysis instantly when an audio URL is pasted
+  useEffect(() => {
+    if (!url || isProcessing || (audioData && audioData.originalUrl === url)) return;
+
+    const lowerUrl = url.toLowerCase().trim();
+    const isHttp = lowerUrl.startsWith("http://") || lowerUrl.startsWith("https://");
+
+    if (isHttp && lowerUrl.length > 12) {
+      const delayDebounceFn = setTimeout(() => {
+        handleProcessUrl();
+      }, 500); // 500ms debounce
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [url, isProcessing, audioData]);
 
   const handleProcessUrl = async () => {
     if (!url) return;
@@ -26,7 +41,7 @@ export default function AudioDownloader() {
 
       if (response.ok) {
         playSuccess();
-        setAudioData(data);
+        setAudioData({ ...data, originalUrl: url });
       } else {
         alert(data.error || 'Failed to fetch video data');
       }

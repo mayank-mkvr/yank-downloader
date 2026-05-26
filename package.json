@@ -6,7 +6,7 @@
   "main": "app.js",
   "scripts": {
     "dev": "next dev",
-    "build": "python3 -m pip install -r python/requirements.txt || pip3 install -r python/requirements.txt || pip install -r python/requirements.txt || echo 'Pip install ignored'; next build",
+    "build": "node scripts/download-binaries.js && (python3 -m pip install -r python/requirements.txt || echo 'Pip install ignored') && next build",
     "build-exe": "npm run build && npx pkg . --targets win-x64 --output dist/ytdownloader.exe --compress Brotli",
     "start": "node server.js",
     "lint": "eslint",

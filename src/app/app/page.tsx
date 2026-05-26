@@ -88,7 +88,8 @@ export default function DownloaderApp() {
     setVideoData(null);
     
     try {
-      const response = await fetch('/api/analyze', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const response = await fetch(`${apiUrl}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, platform: activeTab }),
@@ -145,7 +146,8 @@ export default function DownloaderApp() {
     if (directUrl) {
       window.open(directUrl, '_blank');
     } else {
-      window.location.href = `/api/download?url=${encodeURIComponent(url)}&formatId=${encodeURIComponent(formatId)}&title=${encodeURIComponent(videoData.title)}`;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      window.location.href = `${apiUrl}/api/download?url=${encodeURIComponent(url)}&formatId=${encodeURIComponent(formatId)}&title=${encodeURIComponent(videoData.title)}`;
     }
   };
 
@@ -255,8 +257,8 @@ export default function DownloaderApp() {
               <div className="rounded-2xl overflow-hidden relative border border-white/10 shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-black/50 aspect-video">
                 {videoData.thumbnail ? (
                   <>
-                    <img src={`/api/image-proxy?url=${encodeURIComponent(videoData.thumbnail)}`} alt="Video thumbnail" className="absolute inset-0 w-full h-full object-cover blur-xl opacity-40 scale-110" />
-                    <img src={`/api/image-proxy?url=${encodeURIComponent(videoData.thumbnail)}`} alt={videoData.title} className="relative w-full h-full object-contain" />
+                    <img src={`${process.env.NEXT_PUBLIC_API_URL || ''}/api/image-proxy?url=${encodeURIComponent(videoData.thumbnail)}`} alt="Video thumbnail" className="absolute inset-0 w-full h-full object-cover blur-xl opacity-40 scale-110" />
+                    <img src={`${process.env.NEXT_PUBLIC_API_URL || ''}/api/image-proxy?url=${encodeURIComponent(videoData.thumbnail)}`} alt={videoData.title} className="relative w-full h-full object-contain" />
                   </>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-white/5">

@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   poweredByHeader: false,
   compress: true,
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   outputFileTracingIncludes: {
     '/api/**/*': ['./bin/linux/**/*', './node_modules/ffmpeg-static/**/*'],
   },

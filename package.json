@@ -9,10 +9,12 @@
     "build": "python3 -m pip install -r python/requirements.txt || pip3 install -r python/requirements.txt || pip install -r python/requirements.txt || echo 'Pip install ignored'; next build",
     "build-exe": "npm run build && npx pkg . --targets win-x64 --output dist/ytdownloader.exe --compress Brotli",
     "start": "node server.js",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "node scripts/download-binaries.js"
   },
   "dependencies": {
     "@distube/ytdl-core": "^4.16.12",
+    "ffmpeg-static": "^5.2.0",
     "firebase": "^12.13.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",

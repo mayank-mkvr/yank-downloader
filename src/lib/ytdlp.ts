@@ -10,6 +10,7 @@ const getBinPath = () => {
   const binName = isWin ? 'yt-dlp.exe' : 'yt-dlp';
   
   const searchPaths = [
+    path.resolve(process.cwd(), 'bin', 'linux', 'yt-dlp'),
     path.resolve(process.cwd(), binName),
     path.resolve(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', binName),
     path.resolve(__dirname, '..', '..', '..', '..', binName),

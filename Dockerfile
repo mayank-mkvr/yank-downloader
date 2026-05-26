@@ -18,7 +18,7 @@ COPY package*.json ./
 
 # Install dependencies, bypassing the postinstall binary downloader inside Docker
 ENV DOCKER_BUILD=1
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY . .
@@ -29,3 +29,4 @@ RUN npm run build
 
 # Start the application
 CMD ["npm", "start"]
+

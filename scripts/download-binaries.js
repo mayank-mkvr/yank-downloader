@@ -50,7 +50,11 @@ function download(url, dest) {
 
 async function main() {
   try {
-    // We only need this in production Linux environments (Firebase App Hosting / Vercel)
+    if (process.env.DOCKER_BUILD) {
+        console.log('[Binaries] Skipping download for Docker build. Relying on global apt/pip dependencies.');
+        return;
+    }
+
     if (process.env.NODE_ENV === 'production' || process.env.FIREBASE_APP_HOSTING || process.env.VERCEL) {
         await download(YTDLP_URL, path.join(BIN_DIR, 'yt-dlp'));
     } else {

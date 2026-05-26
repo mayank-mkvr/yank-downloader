@@ -1,0 +1,174 @@
+╔════════════════════════════════════════════════════════╗
+║     YT DOWNLOADER - DOWNLOAD & INSTALLATION GUIDE      ║
+╚════════════════════════════════════════════════════════╝
+
+DOWNLOAD OPTIONS:
+═══════════════════════════════════════════════════════════
+
+1. SINGLE INSTALLER FILE (Recommended)
+   ─────────────────────────────────────
+   File: START-YTDownloader.bat (or INSTALL-AND-RUN.bat)
+   Size: ~2 KB
+   How: Just download and double-click!
+   
+   Location: h:\ytdownloader\dist\
+   Files:
+   - START-YTDownloader.bat
+   - INSTALL-AND-RUN.bat
+   - README.txt
+   - QUICKSTART.txt
+
+
+2. COMPLETE PACKAGE (With Source Code)
+   ────────────────────────────────────
+   Create a ZIP file:
+   - dist/START-YTDownloader.bat
+   - dist/README.txt
+   - dist/QUICKSTART.txt
+   - package.json
+   - next.config.ts
+   - tsconfig.json
+   - src/ folder
+   - public/ folder
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+INSTALLATION STEPS:
+═══════════════════════════════════════════════════════════
+
+Step 1: DOWNLOAD
+├─ Download START-YTDownloader.bat from dist folder
+└─ Or download the complete ZIP package
+
+Step 2: EXTRACT (if ZIP)
+├─ Right-click ZIP file
+├─ Select "Extract All"
+└─ Choose destination folder
+
+Step 3: RUN
+├─ Double-click START-YTDownloader.bat
+├─ Or double-click INSTALL-AND-RUN.bat
+└─ Wait for browser to open (5-30 seconds first time)
+
+Step 4: ENJOY
+├─ Application opens at http://localhost:3000
+├─ Start downloading videos!
+└─ Download folder: Windows Downloads
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHAT YOU GET:
+═══════════════════════════════════════════════════════════
+
+✓ YouTube video downloader
+✓ Multiple format support
+✓ Video/Audio extraction
+✓ Easy-to-use web interface
+✓ Local installation (no server needed)
+✓ Offline-capable after first run
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SYSTEM REQUIREMENTS:
+═══════════════════════════════════════════════════════════
+
+Minimum:
+✓ Windows 7 or later
+✓ 2 GB RAM
+✓ 500 MB disk space
+✓ Internet connection (for first-time setup)
+
+Recommended:
+✓ Windows 10/11
+✓ 4 GB+ RAM
+✓ 1 GB+ free disk space
+✓ High-speed internet
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FIRST RUN:
+═══════════════════════════════════════════════════════════
+
+1. Script checks for Node.js (installs if needed)
+2. Downloads dependencies (~5-10 minutes)
+3. Builds application (~2-3 minutes)
+4. Opens http://localhost:3000 in your browser
+5. Application is ready to use!
+
+Total time: 10-20 minutes (first run only)
+Future runs: 30-60 seconds
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TROUBLESHOOTING:
+═══════════════════════════════════════════════════════════
+
+Problem: "Node.js not found"
+Solution: Run the script again and select "Yes" to install
+
+Problem: "Port 3000 in use"
+Solution: Restart your computer or close other Node.js apps
+
+Problem: "npm command not found"
+Solution: Restart Windows or run cmd.exe as administrator
+
+Problem: Application won't start
+Solution: Delete node_modules and .next folders, run again
+
+Problem: Browser won't open
+Solution: Manually open http://localhost:3000
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FILE LOCATIONS:
+═══════════════════════════════════════════════════════════
+
+Downloaded Videos: C:\Users\[YourName]\Downloads\
+Application Folder: Wherever you extract the files
+Logs: Console window (stays open while app runs)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FEATURES:
+═══════════════════════════════════════════════════════════
+
+✓ Download from YouTube
+✓ Extract audio only (MP3)
+✓ Multiple quality options
+✓ Batch downloading
+✓ Resume downloads
+✓ Video preview
+✓ Format conversion
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GETTING STARTED:
+═══════════════════════════════════════════════════════════
+
+1. Download: START-YTDownloader.bat
+2. Save to: Desktop or Documents
+3. Double-click: Run installer
+4. Wait: For browser to open
+5. Paste: YouTube link in the app
+6. Download: Click download button
+
+That's it!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SUPPORT:
+═══════════════════════════════════════════════════════════
+
+For issues or questions:
+1. Check README.txt
+2. Check QUICKSTART.txt
+3. Look at console output for error messages
+4. Restart your computer
+5. Contact support
+
+════════════════════════════════════════════════════════════
+
+Ready to download? Get START-YTDownloader.bat now!
+
+════════════════════════════════════════════════════════════

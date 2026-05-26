@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ytdl from '@/lib/ytdlp';
-import play from 'play-dl';
 import path from 'path';
 import fs from 'fs';
 import { getRandomProxy } from '@/lib/proxy';
@@ -177,7 +176,8 @@ export async function GET(req: NextRequest) {
         }
 
          const yt = await Innertube.create({
-           cookie: cookieString || undefined
+           cookie: cookieString || undefined,
+           client_type: 'ANDROID_VR'
          });
 
         // Resolve YouTube video ID
@@ -217,12 +217,90 @@ export async function GET(req: NextRequest) {
         headers.set('Content-Type', isAudio ? 'audio/mpeg' : 'video/mp4');
         headers.set('Cache-Control', 'no-store');
 
-        return new Response(stream, {
+        const reader = stream.getReader();
+        const nativeStream = new ReadableStream({
+          async pull(controller) {
+            try {
+              const { done, value } = await reader.read();
+              if (done) {
+                controller.close();
+              } else {
+                controller.enqueue(value);
+              }
+            } catch (err) {
+              controller.error(err);
+            }
+          },
+          cancel() {
+            reader.cancel().catch(() => {});
+          }
+        });
+
+        return new Response(nativeStream, {
           status: 200,
           headers
         });
       } catch (e: any) {
         console.warn('youtubei.js stream failed, falling back to other methods:', e.message);
+      }
+
+      // Try play-dl as the secondary fallback for YouTube streaming
+      try {
+        console.log(`[Download Route] Using play-dl to stream YouTube video...`);
+        const play = require('play-dl');
+        const cookies = getCookiesForPlatform('youtube');
+        if (cookies && cookies.length > 0) {
+          const cookieString = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+          await play.setToken({ youtube: { cookie: cookieString } });
+        }
+
+        const info = await play.video_info(url);
+        let selectedFormat = info.format.find((f: any) => (f.itag?.toString() || f.format_id?.toString()) === itag);
+        
+        if (!selectedFormat) {
+          // Fallback: get the best format matching requested type
+          const isAudio = itag === 'bestaudio' || itag.includes('audio') || itag.includes('mp3');
+          if (isAudio) {
+            selectedFormat = info.format.find((f: any) => !f.video_codec && f.mimeType?.startsWith('audio/'));
+          } else {
+            selectedFormat = info.format.find((f: any) => f.video_codec && f.mimeType?.startsWith('video/'));
+          }
+        }
+        
+        if (!selectedFormat) {
+          selectedFormat = info.format[0];
+        }
+
+        if (!selectedFormat || !selectedFormat.url) {
+          throw new Error('No format URL found via play-dl');
+        }
+
+        console.log(`[play-dl Stream] Fetching format URL: ${selectedFormat.url.slice(0, 100)}...`);
+        const response = await fetch(selectedFormat.url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch from YouTube CDN: ${response.statusText}`);
+        }
+
+        const headers = new Headers();
+        const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_') || 'video';
+        const isAudio = itag === 'bestaudio' || itag.includes('audio') || itag.includes('mp3');
+        const ext = isAudio ? 'mp3' : 'mp4';
+        
+        headers.set('Content-Disposition', `attachment; filename="${cleanTitle}.${ext}"`);
+        headers.set('Content-Type', isAudio ? 'audio/mpeg' : 'video/mp4');
+        headers.set('Cache-Control', 'no-store');
+        
+        const contentLength = response.headers.get('Content-Length');
+        if (contentLength) {
+          headers.set('Content-Length', contentLength);
+        }
+
+        return new NextResponse(response.body as any, {
+          status: 200,
+          headers
+        });
+      } catch (e: any) {
+        console.warn('play-dl stream failed, falling back to other methods:', e.message);
       }
     }
 

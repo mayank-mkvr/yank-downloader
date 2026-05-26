@@ -1,0 +1,84 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                 YT DOWNLOADER - QUICK START                    ║
+╚═══════════════════════════════════════════════════════════════╝
+
+DOWNLOAD & RUN IN 3 STEPS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DOWNLOAD
+   → Download "START-YTDownloader.bat" 
+   → Save it to your desired location
+
+2. DOUBLE-CLICK
+   → Double-click "START-YTDownloader.bat"
+   → Let the script set up everything automatically
+
+3. WAIT & ENJOY
+   → Application will open in your browser
+   → Start downloading videos!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHAT THE SCRIPT DOES:
+✓ Checks for Node.js (installs if needed)
+✓ Installs all dependencies
+✓ Builds the application
+✓ Opens http://localhost:3000 in your browser
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SYSTEM REQUIREMENTS:
+• Windows 7 or later
+• 2GB RAM minimum
+• 500MB free disk space
+• Internet connection (for first setup)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FREQUENTLY ASKED QUESTIONS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Q: Do I need to install anything?
+A: Only the first time! Node.js will be installed automatically if needed.
+
+Q: Where are my downloaded videos?
+A: Downloaded videos will be saved to your Downloads folder by default.
+
+Q: Can I use on other computers?
+A: Yes! Just copy the .bat file and run it on other Windows computers.
+
+Q: What if the browser doesn't open automatically?
+A: Just visit http://localhost:3000 in your browser manually.
+
+Q: How do I stop the server?
+A: Press Ctrl+C in the command window.
+
+Q: Can I close the command window?
+A: No, keep it open while using the app. The window = the server.
+
+Q: It's showing "Port 3000 in use"?
+A: Another app is using port 3000. Kill other servers or restart your PC.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DOWNLOAD OPTIONS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Option 1 - Single File (RECOMMENDED)
+├─ Download: START-YTDownloader.bat
+└─ Size: ~2 KB
+
+Option 2 - Full Package
+├─ Download the complete application folder
+├─ Includes source code and assets
+└─ Size: ~300 MB
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FOR MORE HELP:
+Visit: https://github.com/your-repo/ytdownloader
+Or check: README.txt for detailed instructions
+
+╔═══════════════════════════════════════════════════════════════╗
+║         READY? DOWNLOAD AND RUN START-YTDownloader.bat        ║
+╚═══════════════════════════════════════════════════════════════╝

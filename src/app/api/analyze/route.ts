@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ytdl from '@/lib/ytdlp';
-import play from 'play-dl';
 import path from 'path';
 import fs from 'fs';
 import { getRandomProxy } from '@/lib/proxy';
@@ -180,7 +179,8 @@ export async function POST(req: NextRequest) {
           }
 
           const yt = await Innertube.create({
-            cookie: cookieString || undefined
+            cookie: cookieString || undefined,
+            client_type: 'ANDROID_VR'
           });
 
           // Resolve YouTube video ID
@@ -248,6 +248,66 @@ export async function POST(req: NextRequest) {
           };
         } catch (e: any) {
           console.warn('youtubei.js extraction failed, falling back:', e.message);
+        }
+      }
+
+      // Try play-dl as the secondary fallback for YouTube
+      if (!responseData && (url.includes('youtube.com') || url.includes('youtu.be'))) {
+        try {
+          console.log(`[Analyze Route] Using play-dl to extract YouTube info...`);
+          const play = require('play-dl');
+          const cookies = getCookiesForPlatform('youtube');
+          if (cookies && cookies.length > 0) {
+            const cookieString = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+            await play.setToken({ youtube: { cookie: cookieString } });
+          }
+
+          const info = await play.video_info(url);
+          const rawFormats = info.format || [];
+          
+          const qualitiesList = rawFormats
+            .filter((f: any) => f.mimeType?.startsWith('video/') || f.height > 0)
+            .map((f: any) => {
+              const height = f.height || 0;
+              const container = f.container || f.mimeType?.split(';')[0]?.split('/')[1] || 'mp4';
+              const rawSize = f.contentLength;
+              return {
+                formatId: f.itag?.toString() || f.format_id?.toString() || '',
+                quality: f.qualityLabel || (height ? `${height}p` : '720p'),
+                ext: container,
+                sizeMB: rawSize ? (parseInt(rawSize) / (1024 * 1024)).toFixed(1) : '??',
+                height: height
+              };
+            })
+            .sort((a: any, b: any) => b.height - a.height);
+
+          // Remove duplicates
+          const seen = new Set<string>();
+          const uniqueQualities = qualitiesList.filter((q: any) => {
+            const key = `${q.quality}-${q.ext}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+
+          if (uniqueQualities.length === 0) {
+            throw new Error('No downloadable formats extracted via play-dl');
+          }
+
+          const dur = info.video_details.durationInSec || 0;
+          responseData = {
+            id: info.video_details.id,
+            title: info.video_details.title,
+            author: info.video_details.channel?.name || 'Unknown',
+            thumbnail: info.video_details.thumbnails?.[0]?.url || '',
+            duration: `${Math.floor(dur / 60)}:${(dur % 60).toString().padStart(2, '0')}`,
+            qualities: uniqueQualities,
+            size: 'Varies',
+            source: 'youtube'
+          };
+          console.log(`[Analyze Route] play-dl extraction SUCCESS for: ${info.video_details.title}`);
+        } catch (e: any) {
+          console.warn('play-dl extraction failed, falling back:', e.message);
         }
       }
 

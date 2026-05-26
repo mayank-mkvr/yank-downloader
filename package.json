@@ -2,10 +2,13 @@
   "name": "ytdownloader",
   "version": "0.1.0",
   "private": true,
+  "bin": "app.js",
+  "main": "app.js",
   "scripts": {
     "dev": "next dev",
     "build": "python3 -m pip install -r python/requirements.txt || pip3 install -r python/requirements.txt || pip install -r python/requirements.txt || echo 'Pip install ignored'; next build",
-    "start": "next start",
+    "build-exe": "npm run build && npx pkg . --targets win-x64 --output dist/ytdownloader.exe --compress Brotli",
+    "start": "node server.js",
     "lint": "eslint"
   },
   "dependencies": {
@@ -31,5 +34,19 @@
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "pkg": {
+    "targets": [
+      "win-x64"
+    ],
+    "outputPath": "dist",
+    "scripts": [
+      ".next/**/*"
+    ],
+    "assets": [
+      ".next/**/*",
+      "public/**/*",
+      "python/**/*"
+    ]
   }
 }

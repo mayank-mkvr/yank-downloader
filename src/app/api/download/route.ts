@@ -321,7 +321,23 @@ export async function GET(req: NextRequest) {
     headers.set('Content-Disposition', `attachment; filename="${sanitizedTitle}.mp4"`);
     headers.set('Content-Type', 'video/mp4');
 
-    return new NextResponse(subprocess.stdout as any, {
+    // Convert Node.js Readable stream to Web ReadableStream for Next.js App Router
+    const webStream = new ReadableStream({
+      start(controller) {
+        if (subprocess.stdout) {
+          subprocess.stdout.on('data', (chunk: any) => controller.enqueue(chunk));
+          subprocess.stdout.on('end', () => controller.close());
+          subprocess.stdout.on('error', (err: any) => controller.error(err));
+        } else {
+          controller.close();
+        }
+      },
+      cancel() {
+        if (subprocess) subprocess.kill();
+      }
+    });
+
+    return new NextResponse(webStream, {
       status: 200,
       headers
     });

@@ -9,8 +9,9 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Copy package info
+# Copy package info and scripts required for postinstall
 COPY package*.json ./
+COPY scripts/ ./scripts/
 
 # Install dependencies
 ENV DOCKER_BUILD=1
